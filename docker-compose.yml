@@ -1,0 +1,97 @@
+version: "3.7"
+
+volumes:
+  db_data:
+
+networks:
+  cryptorelax:
+    driver: bridge
+
+services:
+  postgres-db:
+    image: postgres:alpine
+    environment:
+      POSTGRES_DB: cryptorelax
+      POSTGRES_USER: cryptorelax
+      POSTGRES_PASSWORD: cryptorelax
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    expose:
+      - 5432
+    networks:
+      - cryptorelax
+
+  redis:
+    image: redis:latest
+    restart: always
+    expose:
+      - 6379
+    networks:
+      - cryptorelax
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cryptorelax_tg_bot
+    command: ["bash", "-c", "alembic upgrade head && python startapp.py"]
+    restart: on-failure
+    volumes:
+      - .:/app
+    tmpfs:
+      - /run
+      - /var/cache
+      - /tmp
+    env_file:
+      - .env
+    depends_on:
+      - postgres-db
+      - redis
+    networks:
+      - cryptorelax
+
+  celery:
+    build:
+      context: .
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres-db
+      - redis
+      - app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env
+    command: celery -A bot.tasks worker --loglevel=info
+    tmpfs:
+      - /run
+      - /var/cache
+      - /tmp
+    networks:
+      - cryptorelax
+
+  celery-beat:
+    build:
+      context: .
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres-db
+      - redis
+      - app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env
+    command: celery -A celery_beat beat --loglevel=info
+    tmpfs:
+      - /run
+      - /var/cache
+      - /tmp
+    networks:
+      - cryptorelax

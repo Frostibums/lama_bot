@@ -21,7 +21,7 @@ subscription_router = Router()
 section = 'subscription'
 
 
-@subscription_router.message(F.text.lower() == "проверить статус подписки")
+@subscription_router.message(F.text.lower() == "ламыч шо по подписке там")
 async def check_subscription_status(message: Message) -> None:
     exp_date = await get_user_subscription_exp_date(message.from_user.id)
     if not exp_date or exp_date < datetime.date.today():
@@ -30,7 +30,7 @@ async def check_subscription_status(message: Message) -> None:
         await message.answer(f'Ваша подписка заканчивается {exp_date}!', reply_markup=get_main_keyboard())
 
 
-@subscription_router.message(F.text.lower() == "купить подписку")
+@subscription_router.message(F.text.lower() == "я псих и хочу стать топ-криптаном")
 async def buy_subscription(message: Message, state: FSMContext) -> None:
     await state.update_data(plan_id=None, chain=None, txn_hash=None)
     active_plans = await get_active_plans()

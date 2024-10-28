@@ -7,7 +7,7 @@ from aiogram.types import Message
 
 from bot.config import admins
 from bot.keyboards import get_main_keyboard
-from database.services import create_subscription_plan, get_plans, update_plan_activity, change_sub, get_sub_users_info
+from database.services import create_subscription_plan, get_plans, update_plan_activity, give_sub, get_sub_users_info
 
 admin_router = Router()
 
@@ -76,8 +76,8 @@ async def _change_plan(message: Message, active: bool):
     return True
 
 
-@admin_router.message(Command("change_sub"))
-async def change_subscription(message: Message):
+@admin_router.message(Command("give_sub"))
+async def give_subscription(message: Message):
     if message.from_user.id not in admins:
         return False
 
@@ -90,7 +90,7 @@ async def change_subscription(message: Message):
         await message.reply(f'Ошибка формата вводимых данных: {e}')
         return False
 
-    if await change_sub(tg_id, tg_username, end_date):
+    if await give_sub(tg_id, tg_username, end_date):
         await message.reply(f'Выдал доступ {tg_username} до {end_date}')
         return True
     await message.reply('Что-то пошло не так')

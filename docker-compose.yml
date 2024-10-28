@@ -1,0 +1,97 @@
+version: "3.7"
+
+volumes:
+  db_data:
+
+networks:
+  lama:
+    driver: bridge
+
+services:
+  postgres-db:
+    image: postgres:alpine
+    environment:
+      POSTGRES_DB: lama
+      POSTGRES_USER: lama
+      POSTGRES_PASSWORD: lama
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    expose:
+      - 5432
+    networks:
+      - lama
+
+  redis:
+    image: redis:latest
+    restart: always
+    expose:
+      - 6379
+    networks:
+      - lama
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lama_tg_bot
+    command: ["bash", "-c", "alembic upgrade head && python startapp.py"]
+    restart: on-failure
+    volumes:
+      - .:/app
+    tmpfs:
+      - /run
+      - /var/cache
+      - /tmp
+    env_file:
+      - .env
+    depends_on:
+      - postgres-db
+      - redis
+    networks:
+      - lama
+
+#  celery:
+#    build:
+#      context: .
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - postgres-db
+#      - redis
+#      - app
+#    environment:
+#      - CELERY_BROKER_URL=redis://redis:6379/0
+#      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+#    env_file:
+#      - .env
+#    command: celery -A bot.tasks worker --loglevel=info
+#    tmpfs:
+#      - /run
+#      - /var/cache
+#      - /tmp
+#    networks:
+#      - lama
+#
+#  celery-beat:
+#    build:
+#      context: .
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - postgres-db
+#      - redis
+#      - app
+#    environment:
+#      - CELERY_BROKER_URL=redis://redis:6379/0
+#      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+#    env_file:
+#      - .env
+#    command: celery -A celery_beat beat --loglevel=info
+#    tmpfs:
+#      - /run
+#      - /var/cache
+#      - /tmp
+#    networks:
+#      - lama

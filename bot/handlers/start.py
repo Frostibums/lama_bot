@@ -18,7 +18,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
                          parse_mode='Markdown')
 
 
-@start_router.message(F.text.lower() == "подписка")
+@start_router.message(F.text.lower() == "нет я хочу к ламычу в привку")
 async def subscribe(message: Message, state: FSMContext) -> None:
     await state.update_data(plan_id=None, chain=None, txn_hash=None)
     await message.answer(TextService.get_text(section, 'subscription'),
@@ -26,14 +26,14 @@ async def subscribe(message: Message, state: FSMContext) -> None:
                          parse_mode='Markdown')
 
 
-@start_router.message(F.text.lower() == "информация")
+@start_router.message(F.text.lower() == "инфа")
 async def group_info(message: Message) -> None:
     await message.answer(TextService.get_text(section, 'info'),
                          reply_markup=get_main_keyboard(),
                          parse_mode='Markdown')
 
 
-@start_router.message(F.text.lower() == "связь с создателем")
+@start_router.message(F.text.lower() == "контакты")
 async def contact_creator(message: Message) -> None:
     await message.answer(TextService.get_text(section, 'contacts'),
                          reply_markup=get_main_keyboard(),

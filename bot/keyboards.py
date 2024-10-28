@@ -4,40 +4,40 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardBut
 def get_main_keyboard() -> ReplyKeyboardMarkup:
     kb = [
         [
-            KeyboardButton(text="Подписка"),
+            KeyboardButton(text="нет я хочу к ламычу в привку"),
         ],
         [
-            KeyboardButton(text="Информация"),
+            KeyboardButton(text="инфа"),
         ],
         [
-            KeyboardButton(text="Связь с создателем"),
+            KeyboardButton(text="контакты"),
         ]
     ]
 
     return ReplyKeyboardMarkup(
         keyboard=kb,
         resize_keyboard=True,
-        input_field_placeholder="Выберите пункт меню"
+        input_field_placeholder="выбери пункт меню"
     )
 
 
 def get_subscribe_keyboard() -> ReplyKeyboardMarkup:
     kb = [
         [
-            KeyboardButton(text="Купить подписку"),
+            KeyboardButton(text="я псих и хочу стать топ-криптаном"),
         ],
         [
-            KeyboardButton(text="Проверить статус подписки"),
+            KeyboardButton(text="ламыч шо по подписке там"),
         ],
         [
-            KeyboardButton(text="Меню"),
+            KeyboardButton(text="меню"),
         ],
     ]
 
     return ReplyKeyboardMarkup(
         keyboard=kb,
         resize_keyboard=True,
-        input_field_placeholder="Выберите пункт меню"
+        input_field_placeholder="выбери пункт меню"
     )
 
 
@@ -55,16 +55,24 @@ def get_subscribe_plans_keyboard(active_plans) -> InlineKeyboardMarkup:
 def get_subscribe_chain_keyboard() -> InlineKeyboardMarkup:
     kb = [
         [
-            InlineKeyboardButton(text="Optimism USDC", callback_data="chain_optimism_usdc"),
             InlineKeyboardButton(text="Optimism USDT", callback_data="chain_optimism_usdt"),
+            InlineKeyboardButton(text="Optimism USDC", callback_data="chain_optimism_usdc"),
+            InlineKeyboardButton(text="Optimism USDC.e", callback_data="chain_optimism_usdce"),
         ],
         [
-            InlineKeyboardButton(text="Polygon USDC", callback_data="chain_polygon_usdc"),
             InlineKeyboardButton(text="Polygon USDT", callback_data="chain_polygon_usdt"),
+            InlineKeyboardButton(text="Polygon USDC", callback_data="chain_polygon_usdc"),
+            InlineKeyboardButton(text="Polygon USDC.e", callback_data="chain_polygon_usdce"),
         ],
         [
-            InlineKeyboardButton(text="Arbitrum USDC", callback_data="chain_arbitrum_usdc"),
             InlineKeyboardButton(text="Arbitrum USDT", callback_data="chain_arbitrum_usdt"),
+            InlineKeyboardButton(text="Arbitrum USDC", callback_data="chain_arbitrum_usdc"),
+            InlineKeyboardButton(text="Arbitrum USDC.e", callback_data="chain_arbitrum_usdce"),
+        ],
+        [
+            InlineKeyboardButton(text="Base USDT", callback_data="chain_base_usdt"),
+            InlineKeyboardButton(text="Base USDC", callback_data="chain_base_usdc"),
+            InlineKeyboardButton(text="Base USDbC", callback_data="chain_base_usdbc"),
         ],
     ]
 

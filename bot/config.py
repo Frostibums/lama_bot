@@ -16,4 +16,5 @@ SCANS_API_KEYS = {
     'polygon': os.getenv('POLYGONSCAN_API_KEY'),
     'optimism': os.getenv('OPTIMISTIC_API_KEY'),
     'arbitrum': os.getenv('ARBISCAN_API_KEY'),
+    'base': os.getenv('BASE_API_KEY'),
 }

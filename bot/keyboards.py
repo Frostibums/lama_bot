@@ -52,14 +52,23 @@ def get_subscribe_plans_keyboard(active_plans) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-# def get_subscribe_chain_keyboard() -> InlineKeyboardMarkup:
-#     kb = [
-#         [
-#             InlineKeyboardButton(text="TRON", callback_data="chain_tron"),
-#         ],
-#     ]
-#
-#     return InlineKeyboardMarkup(inline_keyboard=kb)
+def get_subscribe_chain_keyboard() -> InlineKeyboardMarkup:
+    kb = [
+        [
+            InlineKeyboardButton(text="Optimism USDC", callback_data="chain_optimism_usdc"),
+            InlineKeyboardButton(text="Optimism USDT", callback_data="chain_optimism_usdt"),
+        ],
+        [
+            InlineKeyboardButton(text="Polygon USDC", callback_data="chain_polygon_usdc"),
+            InlineKeyboardButton(text="Polygon USDT", callback_data="chain_polygon_usdt"),
+        ],
+        [
+            InlineKeyboardButton(text="Arbitrum USDC", callback_data="chain_arbitrum_usdc"),
+            InlineKeyboardButton(text="Arbitrum USDT", callback_data="chain_arbitrum_usdt"),
+        ],
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
 def get_info_keyboard(page_number: int, title: str) -> InlineKeyboardMarkup:

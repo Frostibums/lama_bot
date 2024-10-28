@@ -1,6 +1,7 @@
 import datetime
+from typing import cast
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
 from database.db import async_session
 from database.models import User, SubscriptionPlan, TxnHash, Subscription
@@ -50,11 +51,33 @@ async def has_active_subscription(telegram_id):
     return exp_date >= datetime.date.today()
 
 
-async def create_subscription(telegram_id,
-                              telegram_username,
-                              chain,
-                              transaction_hash,
-                              subscription_plan_id):
+async def change_sub(
+        telegram_id: int,
+        telegram_username: str,
+        end_date: datetime.date,
+) -> bool:
+    async with async_session() as session:
+        user = await get_user_by_telegram_id(telegram_id)
+        if not user:
+            user = await create_user(telegram_id=telegram_id, telegram_username=telegram_username)
+
+        subscription = Subscription(
+            owner_telegram_id=user.telegram_id,
+            end_time=end_date,
+        )
+        session.add(subscription)
+        await session.commit()
+
+        return True
+
+
+async def create_subscription(
+        telegram_id,
+        telegram_username,
+        chain,
+        transaction_hash,
+        subscription_plan_id,
+):
     async with async_session() as session:
         user = await get_user_by_telegram_id(telegram_id)
         plan = await get_plan_by_id(subscription_plan_id)
@@ -80,7 +103,7 @@ async def create_subscription(telegram_id,
             owner_telegram_id=user.telegram_id,
             subscription_plan_id=subscription_plan_id,
             txn_hash_id=new_hash.id,
-            end_time=end_time
+            end_time=end_time,
         )
         session.add(subscription)
         await session.commit()
@@ -121,16 +144,17 @@ async def get_tg_ids_to_kick_by_exp_date(exp_date: datetime.date) -> list[int]:
                   if await get_user_subscription_exp_date(tg_id[0]) <= exp_date]
         return tg_ids or []
 
-# async def get_sub_users_info():
-#     async with async_session() as session:
-#         query = select(
-#             User.telegram_id, User.telegram_username, User.registered_at, func.max(Subscription.end_time).label('end_time')
-#         ).join(
-#             Subscription, User.telegram_id == Subscription.owner_telegram_id
-#         ).group_by(User.telegram_id, Subscription.owner_telegram_id)
-#
-#         query_result = await session.execute(query)
-#         return query_result.all()
+
+async def get_sub_users_info():
+    async with async_session() as session:
+        query = select(
+            User.telegram_id, User.telegram_username, User.registered_at, func.max(Subscription.end_time).label('end_time')
+        ).join(
+            Subscription, User.telegram_id == Subscription.owner_telegram_id
+        ).group_by(User.telegram_id, Subscription.owner_telegram_id)
+
+        query_result = await session.execute(query)
+        return query_result.scalars().all()
 
 
 async def get_active_plans() -> list[SubscriptionPlan]:
@@ -145,3 +169,11 @@ async def get_plans() -> list[SubscriptionPlan]:
         query = select(SubscriptionPlan)
         query_result = await session.execute(query)
         return [plan[0] for plan in query_result.all()] if query_result else []
+
+
+async def update_plan_activity(plan_id: int, active: bool) -> None:
+    async with async_session() as session:
+        stmt = update(SubscriptionPlan).where(
+            cast('ColumnElement[bool]', SubscriptionPlan.id == plan_id)
+        ).values(is_active=active)
+        await session.execute(stmt)

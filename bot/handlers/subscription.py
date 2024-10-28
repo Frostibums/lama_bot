@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
 from bot.config import group_chat_ids
-from bot.keyboards import get_main_keyboard, get_subscribe_plans_keyboard
+from bot.keyboards import get_main_keyboard, get_subscribe_plans_keyboard, get_subscribe_chain_keyboard
 from bot.states import Subscription
 from bot.texts import TextService
 from bot.utils import check_payment_valid
@@ -48,18 +48,21 @@ async def buy_subscription(message: Message, state: FSMContext) -> None:
 async def create_payment(callback: CallbackQuery, state: FSMContext) -> None:
     plan_id = callback.data.split('_')[1]
     await state.update_data(plan_id=plan_id, chain='tron')
-    # await state.set_state(Subscription.chain)
+    await state.set_state(Subscription.chain)
+    await callback.message.edit_text(TextService.get_text(section, 'ask_chain'),
+                                     parse_mode='Markdown',
+                                     reply_markup=get_subscribe_chain_keyboard())
+
+
+@subscription_router.callback_query(Subscription.chain)
+async def process_chain(callback: CallbackQuery, state: FSMContext) -> None:
+    cb_data = callback.data.split('_')
+    chain = cb_data[1].lower()
+    token = cb_data[2].lower()
+    await state.update_data(chain=chain.lower())
+    await state.update_data(token=token.lower())
     await state.set_state(Subscription.txn_hash)
-    await callback.message.edit_text(TextService.get_text(section, 'ask_hash'),
-                                     parse_mode='Markdown')
-
-
-# @subscription_router.callback_query(Subscription.chain)
-# async def process_chain(callback: CallbackQuery, state: FSMContext) -> None:
-#     chain = callback.data.split('_')[1]
-#     await state.update_data(chain=chain.lower())
-#     await state.set_state(Subscription.txn_hash)
-#     await callback.message.edit_text(f'Вы выбрали {chain}.\nТеперь отправьте хэш оплаты!')
+    await callback.message.edit_text(f'Вы выбрали {token} в сети {chain}.\nТеперь отправьте хэш оплаты!')
 
 
 @subscription_router.message(Subscription.txn_hash)
@@ -71,11 +74,12 @@ async def process_hash(message: Message, state: FSMContext) -> None:
         await state.update_data(plan_id=None, chain=None, txn_hash=None)
         return
     chain = data.get('chain')
+    token = data.get('token')
     txn_hash = data.get('txn_hash')
     tg_user = message.from_user
 
     reply_msg = await message.reply(text=f'Проверяем...', reply_markup=get_main_keyboard())
-    if await check_payment_valid(plan_id, chain, txn_hash):
+    if await check_payment_valid(plan_id, chain, token, txn_hash):
         try:
             msg_text = TextService.get_text(section, 'thank_for_sub')
             if not await has_active_subscription(tg_user.id):

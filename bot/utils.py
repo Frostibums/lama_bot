@@ -1,48 +1,56 @@
+import datetime
+import logging
+
 import aiohttp
 
 from bot.consts import STABLES_CONTRACTS, SCANS_API_ADDYS
-from bot.config import PAYMENT_WALLET
+from bot.config import PAYMENT_WALLET, SCANS_API_KEYS
 from database.services import get_transaction_hash, get_plan_price_by_id
 
 
-async def check_payment_valid(plan_id, chain, txn_hash) -> bool:
-    if not all([plan_id, chain, txn_hash]):
+async def check_payment_valid(plan_id, chain, token, txn_hash) -> bool:
+    if not all([plan_id, chain, token, txn_hash]):
         return False
 
     if await get_transaction_hash(txn_hash):
         return False
 
-    txn = await get_tron_txn_info(txn_hash)
-    if not txn:
+    txns = await get_transfers_txns_from_scan(chain, token)
+    if not txns:
         return False
 
-    token_addy = STABLES_CONTRACTS.get('tron')
     decimals = 10 ** 6  # decimals for stables
+    subscription_price = await get_plan_price_by_id(plan_id) * decimals
 
-    if txn.get('contractRet') != 'SUCCESS' or not txn.get('confirmed'):
-        return False
-
-    if not txn.get('contract_map') or not txn['contract_map'].get(token_addy):
-        return False
-
-    subscription_price = await get_plan_price_by_id(plan_id)
-    subscription_price *= decimals
-    for info in txn.get('trc20TransferInfo'):
-        if all([
-            info.get('contract_address') == token_addy,
-            info.get('type') == 'Transfer',
-            info.get('to_address') == str(PAYMENT_WALLET),
-            int(info.get('amount_str', -1)) >= subscription_price,
-        ]):
+    for txn in txns:
+        logging.info(int(txn.get('timeStamp')))
+        if txn.get('hash').lower() == txn_hash.lower():
+            if any([
+                txn.get('to').lower() != PAYMENT_WALLET.lower(),
+                int(txn.get('value')) < subscription_price,
+                int(txn.get('timeStamp')) < int(datetime.datetime.now().timestamp()) + 60 * 60
+            ]):
+                return False
             return True
 
     return False
 
 
-async def get_tron_txn_info(txn_hash: str) -> dict:
+async def get_transfers_txns_from_scan(chain, token):
     params = {
-        'hash': txn_hash,
+        'module': 'account',
+        'action': 'tokentx',
+        'contractaddress': STABLES_CONTRACTS.get(token.lower()).get(chain.lower()),
+        'address': PAYMENT_WALLET,
+        'page': '1',
+        'offset': '100',
+        'startblock': '0',
+        'endblock': '999999999',
+        'sort': 'desc',
+        'apikey': SCANS_API_KEYS.get(chain),
     }
+
     async with aiohttp.ClientSession() as session:
-        async with session.get(SCANS_API_ADDYS.get('tron'), params=params) as resp:
-            return await resp.json()
+        async with session.get(SCANS_API_ADDYS.get(chain), params=params) as resp:
+            resp_json = await resp.json()
+            return resp_json.get('result')

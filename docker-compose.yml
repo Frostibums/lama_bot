@@ -4,16 +4,16 @@ volumes:
   db_data:
 
 networks:
-  cryptorelax:
+  lama:
     driver: bridge
 
 services:
   postgres-db:
     image: postgres:alpine
     environment:
-      POSTGRES_DB: cryptorelax
-      POSTGRES_USER: cryptorelax
-      POSTGRES_PASSWORD: cryptorelax
+      POSTGRES_DB: lama
+      POSTGRES_USER: lama
+      POSTGRES_PASSWORD: lama
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -21,7 +21,7 @@ services:
     expose:
       - 5432
     networks:
-      - cryptorelax
+      - lama
 
   redis:
     image: redis:latest
@@ -29,13 +29,13 @@ services:
     expose:
       - 6379
     networks:
-      - cryptorelax
+      - lama
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cryptorelax_tg_bot
+    container_name: lama_tg_bot
     command: ["bash", "-c", "alembic upgrade head && python startapp.py"]
     restart: on-failure
     volumes:
@@ -50,7 +50,7 @@ services:
       - postgres-db
       - redis
     networks:
-      - cryptorelax
+      - lama
 
   celery:
     build:
@@ -72,7 +72,7 @@ services:
       - /var/cache
       - /tmp
     networks:
-      - cryptorelax
+      - lama
 
   celery-beat:
     build:
@@ -94,4 +94,4 @@ services:
       - /var/cache
       - /tmp
     networks:
-      - cryptorelax
+      - lama

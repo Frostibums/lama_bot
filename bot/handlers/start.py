@@ -1,8 +1,12 @@
+import logging
+import os
+
+import loguru
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.methods import DeleteMessage
-from aiogram.types import Message
+from aiogram.types import Message, InputFile, FSInputFile
 
 from bot.keyboards import get_main_keyboard, get_subscribe_keyboard, get_info_keyboard
 from bot.texts import TextService
@@ -17,6 +21,17 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     await message.answer(TextService.get_text(section, 'greeting'),
                          reply_markup=get_main_keyboard(),
                          parse_mode='Markdown')
+
+
+@start_router.message(F.voice)
+async def voice(message: Message, state: FSMContext) -> None:
+    logging.info('\n\n')
+    logging.info(f'{message.voice.file_id}')
+    await message.bot.send_voice(message.chat.id, message.voice.file_id)
+
+    file = FSInputFile('bot/voices/audio_2024-03-13_19-20-18.ogg')
+    await message.bot.send_voice(message.chat.id, file)
+
 
 
 @start_router.message(F.text.lower() == "подписка")

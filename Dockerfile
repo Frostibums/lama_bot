@@ -1,8 +1,8 @@
 FROM python:3.10
 
-RUN mkdir /cryptorelax_bot_app
+RUN mkdir /lama_bot_app
 
-WORKDIR /cryptorelax_bot_app
+WORKDIR /lama_bot_app
 
 COPY requirements.txt .
 

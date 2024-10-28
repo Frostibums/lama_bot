@@ -52,7 +52,7 @@ async def has_active_subscription(telegram_id):
     return exp_date >= datetime.date.today()
 
 
-async def change_sub(
+async def give_sub(
         telegram_id: int,
         telegram_username: str,
         end_date: datetime.date,

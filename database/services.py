@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import cast
 
 from sqlalchemy import select, func, update
@@ -148,13 +149,16 @@ async def get_tg_ids_to_kick_by_exp_date(exp_date: datetime.date) -> list[int]:
 async def get_sub_users_info():
     async with async_session() as session:
         query = select(
-            User.telegram_id, User.telegram_username, User.registered_at, func.max(Subscription.end_time).label('end_time')
+            User.telegram_id,
+            User.telegram_username,
+            User.registered_at,
+            func.max(Subscription.end_time).label('end_time')
         ).join(
             Subscription, User.telegram_id == Subscription.owner_telegram_id
-        ).group_by(User.telegram_id, Subscription.owner_telegram_id)
+        ).group_by(User.telegram_id, User.telegram_username, User.registered_at)
 
         query_result = await session.execute(query)
-        return query_result.scalars().all()
+        return query_result.fetchall()
 
 
 async def get_active_plans() -> list[SubscriptionPlan]:
@@ -177,3 +181,4 @@ async def update_plan_activity(plan_id: int, active: bool) -> None:
             cast('ColumnElement[bool]', SubscriptionPlan.id == plan_id)
         ).values(is_active=active)
         await session.execute(stmt)
+        await session.commit()

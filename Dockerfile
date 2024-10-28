@@ -1,8 +1,8 @@
 FROM python:3.10
 
-RUN mkdir /lama_bot_app
+RUN mkdir /app
 
-WORKDIR /lama_bot_app
+WORKDIR /app
 
 COPY requirements.txt .
 

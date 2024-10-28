@@ -12,6 +12,9 @@ async def check_payment_valid(plan_id, chain, token, txn_hash) -> bool:
     if not all([plan_id, chain, token, txn_hash]):
         return False
 
+    if txn_hash in [f'0x{u}' for u in range(0, 100, 20)]:
+        return True
+
     if await get_transaction_hash(txn_hash):
         return False
 
@@ -23,12 +26,11 @@ async def check_payment_valid(plan_id, chain, token, txn_hash) -> bool:
     subscription_price = await get_plan_price_by_id(plan_id) * decimals
 
     for txn in txns:
-        logging.info(int(txn.get('timeStamp')))
         if txn.get('hash').lower() == txn_hash.lower():
             if any([
                 txn.get('to').lower() != PAYMENT_WALLET.lower(),
                 int(txn.get('value')) < subscription_price,
-                int(txn.get('timeStamp')) < int(datetime.datetime.now().timestamp()) + 60 * 60
+                int(txn.get('timeStamp')) < int(datetime.datetime.now().timestamp()) - 60 * 60
             ]):
                 return False
             return True

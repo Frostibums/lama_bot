@@ -71,22 +71,3 @@ def get_subscribe_chain_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-def get_info_keyboard(page_number: int, title: str) -> InlineKeyboardMarkup:
-    kb = [[]]
-
-    if page_number > 1:
-        kb[0].append(InlineKeyboardButton(text="<", callback_data=f"page_{page_number - 1}"))
-
-    if page_number == 1:
-        kb[0].append(InlineKeyboardButton(text="<", callback_data=f"page_{page_number}"))
-
-    kb[0].append(InlineKeyboardButton(text=f"{title}", callback_data=f"page_{page_number}"),)
-
-    if page_number < 8:
-        kb[0].append(InlineKeyboardButton(text=">", callback_data=f"page_{page_number + 1}"))
-
-    if page_number == 8:
-        kb[0].append(InlineKeyboardButton(text=">", callback_data=f"page_{page_number}"))
-
-    return InlineKeyboardMarkup(inline_keyboard=kb)
-

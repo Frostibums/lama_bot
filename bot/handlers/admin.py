@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from aiogram import Router
 from aiogram.filters import Command
@@ -31,7 +32,7 @@ async def add_plan(message: Message):
     return
 
 
-@admin_router.message(Command("plans_list"))
+@admin_router.message(Command("plans"))
 async def plans_list(message: Message):
     if message.from_user.id not in admins:
         return
@@ -45,14 +46,14 @@ async def plans_list(message: Message):
     return
 
 
-@admin_router.message(Command("off_plan"))
+@admin_router.message(Command("plan_off"))
 async def off_plan(message: Message):
     if await _change_plan(message, False):
         await message.reply('План деактивирован', reply_markup=get_main_keyboard())
     return
 
 
-@admin_router.message(Command("on_plan"))
+@admin_router.message(Command("plan_on"))
 async def on_plan(message: Message):
     if await _change_plan(message, True):
         await message.reply('План активирован', reply_markup=get_main_keyboard())
@@ -83,7 +84,7 @@ async def change_subscription(message: Message):
     data = message.text.split()
 
     try:
-        tg_id, tg_username, end_date = int(data[1]), str(data[2]), str(data[3])
+        tg_id, tg_username, end_date = int(data[1]), str(data[2]).strip('@'), str(data[3])
         end_date = datetime.date.fromisoformat(end_date)
     except Exception as e:
         await message.reply(f'Ошибка формата вводимых данных: {e}')
@@ -99,10 +100,16 @@ async def change_subscription(message: Message):
 async def users_info(message: Message):
     if message.from_user.id not in admins:
         return False
-    msg = []
+    msg = ['ID | Telegram ID | Registered | Sub End']
     infos = await get_sub_users_info()
-    for info in infos:
-        print(info)
-        msg.append(f'')  # TODO: дописать
+
+    for i, user in enumerate(infos):
+        telegram_id = str(user.telegram_id)
+        username = user.telegram_username
+        registered_at = user.registered_at.strftime("%Y-%m-%d %H:%M")
+        end_time = user.end_time.strftime("%Y-%m-%d %H:%M") if user.end_time else "—"
+
+        msg.append(f"{i + 1}. {username} {telegram_id} {registered_at} {end_time}")
+
     await message.reply('\n'.join(msg))
 

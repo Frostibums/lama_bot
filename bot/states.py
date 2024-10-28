@@ -6,7 +6,3 @@ class Subscription(StatesGroup):
     chain = State()
     token = State()
     txn_hash = State()
-
-
-class InfoPage(StatesGroup):
-    info_msg_id = State()

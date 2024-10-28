@@ -52,46 +52,46 @@ services:
     networks:
       - lama
 
-  celery:
-    build:
-      context: .
-    volumes:
-      - .:/app
-    depends_on:
-      - postgres-db
-      - redis
-      - app
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    env_file:
-      - .env
-    command: celery -A bot.tasks worker --loglevel=info
-    tmpfs:
-      - /run
-      - /var/cache
-      - /tmp
-    networks:
-      - lama
-
-  celery-beat:
-    build:
-      context: .
-    volumes:
-      - .:/app
-    depends_on:
-      - postgres-db
-      - redis
-      - app
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    env_file:
-      - .env
-    command: celery -A celery_beat beat --loglevel=info
-    tmpfs:
-      - /run
-      - /var/cache
-      - /tmp
-    networks:
-      - lama
+#  celery:
+#    build:
+#      context: .
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - postgres-db
+#      - redis
+#      - app
+#    environment:
+#      - CELERY_BROKER_URL=redis://redis:6379/0
+#      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+#    env_file:
+#      - .env
+#    command: celery -A bot.tasks worker --loglevel=info
+#    tmpfs:
+#      - /run
+#      - /var/cache
+#      - /tmp
+#    networks:
+#      - lama
+#
+#  celery-beat:
+#    build:
+#      context: .
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - postgres-db
+#      - redis
+#      - app
+#    environment:
+#      - CELERY_BROKER_URL=redis://redis:6379/0
+#      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+#    env_file:
+#      - .env
+#    command: celery -A celery_beat beat --loglevel=info
+#    tmpfs:
+#      - /run
+#      - /var/cache
+#      - /tmp
+#    networks:
+#      - lama

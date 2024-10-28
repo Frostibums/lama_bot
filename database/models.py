@@ -37,9 +37,6 @@ class Subscription(Base):
     id = Column(Integer, primary_key=True)
     owner_telegram_id = Column(BigInteger, ForeignKey('users.telegram_id'))
     subscription_plan_id = Column(BigInteger, ForeignKey('subscription_plans.id'), nullable=True)
-    txn_hash_id = Column(Integer, ForeignKey('txn_hashs.id'), nullable=True)
+    txn_hash_id = Column(Integer, ForeignKey('txn_hashes.id'), nullable=True)
     start_time = Column(DATE, default=datetime.date.today())
     end_time = Column(DATE, nullable=True)
-    
-    owner_telegram = relationship('User', back_populates='subscriptions')
-

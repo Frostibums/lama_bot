@@ -5,7 +5,8 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
-from bot.config import group_chat_ids
+from bot.config import group_chat_ids, PAYMENT_WALLET
+from bot.consts import STABLES_CONTRACTS
 from bot.keyboards import get_main_keyboard, get_subscribe_plans_keyboard, get_subscribe_chain_keyboard
 from bot.states import Subscription
 from bot.texts import TextService
@@ -21,12 +22,7 @@ section = 'subscription'
 
 
 @subscription_router.message(F.text.lower() == "проверить статус подписки")
-async def check_subscription_status(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    msg_id = data.get('info_msg_id')
-    await state.clear()
-    await state.update_data(info_msg_id=msg_id)
-
+async def check_subscription_status(message: Message) -> None:
     exp_date = await get_user_subscription_exp_date(message.from_user.id)
     if not exp_date or exp_date < datetime.date.today():
         await message.answer(TextService.get_text(section, 'has_no_sub'), reply_markup=get_main_keyboard())
@@ -47,7 +43,7 @@ async def buy_subscription(message: Message, state: FSMContext) -> None:
 @subscription_router.callback_query(Subscription.plan_id, F.data.contains('subscription_'))
 async def create_payment(callback: CallbackQuery, state: FSMContext) -> None:
     plan_id = callback.data.split('_')[1]
-    await state.update_data(plan_id=plan_id, chain='tron')
+    await state.update_data(plan_id=plan_id)
     await state.set_state(Subscription.chain)
     await callback.message.edit_text(TextService.get_text(section, 'ask_chain'),
                                      parse_mode='Markdown',
@@ -62,7 +58,11 @@ async def process_chain(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(chain=chain.lower())
     await state.update_data(token=token.lower())
     await state.set_state(Subscription.txn_hash)
-    await callback.message.edit_text(f'Вы выбрали {token} в сети {chain}.\nТеперь отправьте хэш оплаты!')
+    contract_address = STABLES_CONTRACTS.get(token).get(chain)
+    await callback.message.edit_text(f'Вы выбрали {token} в сети {chain}\n'
+                                     f'Используемый адрес контракта: {contract_address}\n'
+                                     f'Переводить сюда: {PAYMENT_WALLET}\n'
+                                     f'Теперь отправьте хэш оплаты!')
 
 
 @subscription_router.message(Subscription.txn_hash)

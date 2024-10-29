@@ -16,7 +16,6 @@ from database.services import (get_user_subscription_exp_date,
                                has_active_subscription,
                                create_subscription)
 
-
 subscription_router = Router()
 section = 'subscription'
 
@@ -59,10 +58,13 @@ async def process_chain(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(token=token.lower())
     await state.set_state(Subscription.txn_hash)
     contract_address = STABLES_CONTRACTS.get(token).get(chain)
-    await callback.message.edit_text(f'Вы выбрали {token} в сети {chain}\n'
-                                     f'Используемый адрес контракта: `{contract_address}`\n'
-                                     f'Переводить сюда:\n`{PAYMENT_WALLET}`\n'
-                                     f'Теперь отправьте хэш оплаты!')
+    await callback.message.edit_text(
+        f'Вы выбрали {token} в сети {chain}\n'
+        f'Используемый адрес контракта: `{contract_address}`\n'
+        f'Переводить сюда:\n`{PAYMENT_WALLET}`\n'
+        f'Теперь отправьте хэш оплаты!',
+        parse_mode='Markdown',
+    )
 
 
 @subscription_router.message(Subscription.txn_hash)
@@ -97,7 +99,7 @@ async def process_hash(message: Message, state: FSMContext) -> None:
             )
 
             await message.answer(text=msg_text, reply_markup=get_main_keyboard())
-            await send_notification(message.bot, f'{message.from_user.username} купил подписку: {txn_hash} ({chain})')
+            await send_notification(message.bot, f'{message.from_user.username} купил подписку: `{txn_hash}` ({chain})')
 
         except TelegramBadRequest:
             await message.answer(text=TextService.get_text(section, 'telegram_error'),

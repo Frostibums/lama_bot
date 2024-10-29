@@ -35,11 +35,11 @@ async def async_kick_users_with_exp_sub():
     for telegram_id in telegram_ids_to_kick:
         for chat_id in group_chat_ids:
             try:
-                await kick_user_from_group(chat_id, telegram_id)
-                await send_notification(
-                    tg_bot,
-                    f'Кикнут telegram id: `{telegram_id}`',
-                )
+                if await kick_user_from_group(chat_id, telegram_id):
+                    await send_notification(
+                        tg_bot,
+                        f'Кикнут telegram id: `{telegram_id}`',
+                    )
                 await asyncio.sleep(1)
             except Exception as e:
                 continue

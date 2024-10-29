@@ -4,7 +4,7 @@ import logging
 import aiohttp
 
 from bot.consts import STABLES_CONTRACTS, SCANS_API_ADDYS
-from bot.config import PAYMENT_WALLET, SCANS_API_KEYS
+from bot.config import PAYMENT_WALLET, SCANS_API_KEYS, notification_chat_id
 from database.services import get_transaction_hash, get_plan_price_by_id
 
 
@@ -56,3 +56,13 @@ async def get_transfers_txns_from_scan(chain, token):
         async with session.get(SCANS_API_ADDYS.get(chain), params=params) as resp:
             resp_json = await resp.json()
             return resp_json.get('result')
+
+
+async def send_notification(bot, msg: str):
+    try:
+        await bot.send_message(
+            notification_chat_id,
+            msg,
+        )
+    except Exception as e:
+        logging.error(e)

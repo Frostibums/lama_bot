@@ -12,9 +12,6 @@ async def check_payment_valid(plan_id, chain, token, txn_hash) -> bool:
     if not all([plan_id, chain, token, txn_hash]):
         return False
 
-    if txn_hash in [f'0x{u}' for u in range(0, 100, 20)]:
-        return True
-
     if await get_transaction_hash(txn_hash):
         return False
 

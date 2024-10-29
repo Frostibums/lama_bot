@@ -9,7 +9,7 @@ TOKEN = os.getenv('BOT_TOKEN')
 PAYMENT_WALLET = os.getenv('PAYMENT_WALLET')
 
 group_chat_ids = [int(val) for val in os.getenv('group_chat_ids').split(',')]
-notifications_chat_id = os.getenv('notifications_chat_id')
+notification_chat_id = os.getenv('notification_chat_id')
 admins = [int(val) for val in os.getenv('admins').split(',')]
 
 SCANS_API_KEYS = {

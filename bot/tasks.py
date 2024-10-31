@@ -2,7 +2,6 @@ import asyncio
 import datetime
 
 from bot.texts import TextService
-from bot.utils import send_notification
 from celery_beat import celery_app
 from database.services import get_tg_ids_to_notify_by_exp_date, get_tg_ids_to_kick_by_exp_date
 from bot.bot_tg import tg_bot
@@ -35,11 +34,7 @@ async def async_kick_users_with_exp_sub():
     for telegram_id in telegram_ids_to_kick:
         for chat_id in group_chat_ids:
             try:
-                if await kick_user_from_group(chat_id, telegram_id):
-                    await send_notification(
-                        tg_bot,
-                        f'Кикнут telegram id: `{telegram_id}`',
-                    )
+                await kick_user_from_group(chat_id, telegram_id)
                 await asyncio.sleep(1)
             except Exception as e:
                 continue

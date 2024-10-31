@@ -18,19 +18,33 @@ async def kick_user_from_group(chat_id, user_tg_id) -> bool:
 
 
 async def async_notify_about_subscription_expiration():
-    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
-    telegram_ids_to_notify = await get_tg_ids_to_notify_by_exp_date(tomorrow)
+    delta_days = 3
+    today = datetime.date.today()
+
+    telegram_ids_to_notify = set(await get_tg_ids_to_notify_by_exp_date(today + datetime.timedelta(days=delta_days)))
     for telegram_id in telegram_ids_to_notify:
         try:
             await tg_bot.send_message(telegram_id, TextService.get_text('subscription', 'expiration'))
         except Exception as e:
             continue
+
+    telegram_ids_expired = set()
+    for i in range(1, delta_days + 1):
+        telegram_ids_expired.union(await get_tg_ids_to_notify_by_exp_date(today - datetime.timedelta(days=i)))
+
+    for telegram_id in telegram_ids_expired:
+        try:
+            await tg_bot.send_message(telegram_id, TextService.get_text('subscription', 'expired'))
+        except Exception as e:
+            continue
+
     return True
 
 
 async def async_kick_users_with_exp_sub():
-    today = datetime.date.today()
-    telegram_ids_to_kick = await get_tg_ids_to_kick_by_exp_date(today)
+    delta_days = 3
+    kick_day = datetime.date.today() - datetime.timedelta(days=delta_days)
+    telegram_ids_to_kick = await get_tg_ids_to_kick_by_exp_date(kick_day)
     for telegram_id in telegram_ids_to_kick:
         for chat_id in group_chat_ids:
             try:

@@ -100,16 +100,20 @@ async def give_subscription(message: Message):
 async def users_info(message: Message):
     if message.from_user.id not in admins:
         return False
-    msg = ['ID | Telegram ID | Registered | Sub End']
+    msg = ['ID | Username | Telegram ID | Registered | Sub End']
     infos = await get_sub_users_info()
 
     for i, user in enumerate(infos):
         telegram_id = str(user.telegram_id)
         username = user.telegram_username
-        registered_at = user.registered_at.strftime("%Y-%m-%d %H:%M")
-        end_time = user.end_time.strftime("%Y-%m-%d %H:%M") if user.end_time else "—"
+        registered_at = user.registered_at.strftime("%Y-%m-%d")
+        end_time = user.end_time.strftime("%Y-%m-%d") if user.end_time else "—"
 
-        msg.append(f"{i + 1}. {username} {telegram_id} {registered_at} {end_time}")
+        msg.append(f"{i + 1}. `{username}` {telegram_id} `{registered_at}` {end_time}")
 
-    await message.reply('\n'.join(msg))
+    delta = 50
+    i = 50
+    while i <= len(msg) + delta:
+        await message.reply('\n'.join(msg[i-delta:i]), parse_mode='Markdown')
+        i += delta
 

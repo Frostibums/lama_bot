@@ -60,7 +60,7 @@ async def process_chain(callback: CallbackQuery, state: FSMContext) -> None:
     contract_address = STABLES_CONTRACTS.get(token).get(chain)
     await callback.message.edit_text(
         f'Вы выбрали {token} в сети {chain}\n'
-        f'Используемый адрес контракта: `{contract_address}`\n'
+        f'Используемый адрес контракта: ||`{contract_address}`||\n'
         f'Переводить сюда:\n`{PAYMENT_WALLET}`\n'
         f'Теперь отправьте хэш оплаты!',
         parse_mode='MarkdownV2',

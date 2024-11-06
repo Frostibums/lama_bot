@@ -63,7 +63,7 @@ async def process_chain(callback: CallbackQuery, state: FSMContext) -> None:
         f'Используемый адрес контракта: `{contract_address}`\n'
         f'Переводить сюда:\n`{PAYMENT_WALLET}`\n'
         f'Теперь отправьте хэш оплаты!',
-        parse_mode='Markdown',
+        parse_mode='MarkdownV2',
     )
 
 

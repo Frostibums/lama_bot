@@ -27,7 +27,7 @@ async def check_payment_valid(plan_id, chain, token, txn_hash) -> bool:
             if any([
                 txn.get('to').lower() != PAYMENT_WALLET.lower(),
                 int(txn.get('value')) < subscription_price,
-                int(txn.get('timeStamp')) < int(datetime.datetime.now().timestamp()) - 60 * 60
+                int(txn.get('timeStamp')) < int(datetime.datetime.now().timestamp()) - (60 * 60 * 48)
             ]):
                 return False
             return True

@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 
+from aiogram.enums import ChatMemberStatus
 from aiogram.exceptions import TelegramBadRequest
 
 from bot.texts import TextService
@@ -13,8 +14,10 @@ from bot.config import group_chat_ids
 
 async def kick_user_from_group(chat_id, user_tg_id) -> bool:
     try:
-        await tg_bot.get_chat_member(chat_id=chat_id, user_id=int(user_tg_id))
+        member = await tg_bot.get_chat_member(chat_id=chat_id, user_id=int(user_tg_id))
     except TelegramBadRequest:
+        return False
+    if member.status != ChatMemberStatus.MEMBER:
         return False
     try:
         await tg_bot.ban_chat_member(chat_id=chat_id, user_id=user_tg_id)

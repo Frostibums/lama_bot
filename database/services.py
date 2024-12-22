@@ -4,6 +4,7 @@ from typing import cast
 
 from sqlalchemy import select, func, update
 
+from bot.config import group_chat_ids, group_2_chat_ids
 from database.db import async_session
 from database.models import User, SubscriptionPlan, TxnHash, Subscription
 
@@ -37,16 +38,20 @@ async def get_plan_price_by_id(plan_id):
     return plan.price if plan else None
 
 
-async def get_user_subscription_exp_date(telegram_id):
+async def get_user_subscription_exp_date(telegram_id, subscr_lvl: int = 1):
     async with async_session() as session:
-        query = select(func.max(Subscription.end_time)).filter_by(owner_telegram_id=telegram_id)
+        query = (
+            select(func.max(Subscription.end_time))
+            .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+            .where(Subscription.owner_telegram_id == telegram_id, SubscriptionPlan.level == subscr_lvl)
+        )
         query_result = await session.execute(query)
         exp_date = query_result.first()
         return exp_date[0] if exp_date else None
 
 
-async def has_active_subscription(telegram_id):
-    exp_date = await get_user_subscription_exp_date(telegram_id)
+async def has_active_subscription(telegram_id, subscr_lvl: int = 1):
+    exp_date = await get_user_subscription_exp_date(telegram_id, subscr_lvl)
     if not exp_date:
         return False
     return exp_date >= datetime.date.today()
@@ -120,30 +125,50 @@ async def get_transaction_hash(transaction_hash):
     return txn_hash[0] if txn_hash else None
 
 
-async def create_subscription_plan(subscription_time, price):
+async def create_subscription_plan(subscription_time, price, level, text):
     async with async_session() as session:
-        new_plan = SubscriptionPlan(subscription_time=subscription_time, price=price)
+        new_plan = SubscriptionPlan(subscription_time=subscription_time, price=price, level=level, text=text)
         session.add(new_plan)
         await session.commit()
         return new_plan
 
 
-async def get_tg_ids_to_notify_by_exp_date(exp_date: datetime.date) -> list[int]:
+async def get_tg_ids_to_notify_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[int]:
     async with async_session() as session:
-        query = select(Subscription.owner_telegram_id).where(Subscription.end_time == exp_date)
+        query = (
+            select(Subscription.owner_telegram_id)
+            .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+            .where(Subscription.end_time == exp_date, SubscriptionPlan.level == level)
+        )
+        query_result = await session.scalars(query)
+        tg_ids = []
+        for tg_id in query_result:
+            end_date = await get_user_subscription_exp_date(tg_id, level)
+            if end_date and end_date <= exp_date:
+                tg_ids.append(tg_id)
+        return tg_ids
+
+
+async def get_tg_ids_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[int]:
+    async with async_session() as session:
+        query = select(Subscription.owner_telegram_id).where(Subscription.end_time <= exp_date).filter_by(level=level)
         query_result = await session.execute(query)
         tg_ids = [tg_id[0] for tg_id in query_result.all()
-                  if await get_user_subscription_exp_date(tg_id[0]) <= exp_date]
+                  if await get_user_subscription_exp_date(tg_id[0], level) <= exp_date]
         return tg_ids or []
 
 
-async def get_tg_ids_to_kick_by_exp_date(exp_date: datetime.date) -> list[int]:
+async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[User]:
+    query = (
+        select(User)
+        .join(Subscription, User.telegram_id == Subscription.owner_telegram_id)
+        .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+        .where(SubscriptionPlan.level == level)
+        .where(Subscription.end_time <= exp_date)
+    )
+
     async with async_session() as session:
-        query = select(Subscription.owner_telegram_id).where(Subscription.end_time <= exp_date)
-        query_result = await session.execute(query)
-        tg_ids = [tg_id[0] for tg_id in query_result.all()
-                  if await get_user_subscription_exp_date(tg_id[0]) <= exp_date]
-        return tg_ids or []
+        return await session.scalars(query)
 
 
 async def get_sub_users_info():
@@ -170,9 +195,7 @@ async def get_active_plans() -> list[SubscriptionPlan]:
 
 async def get_plans() -> list[SubscriptionPlan]:
     async with async_session() as session:
-        query = select(SubscriptionPlan)
-        query_result = await session.execute(query)
-        return [plan[0] for plan in query_result.all()] if query_result else []
+        return await session.scalars(select(SubscriptionPlan))
 
 
 async def update_plan_activity(plan_id: int, active: bool) -> None:
@@ -182,3 +205,11 @@ async def update_plan_activity(plan_id: int, active: bool) -> None:
         ).values(is_active=active)
         await session.execute(stmt)
         await session.commit()
+
+
+async def get_plan_chats_by_lvl(level: int) -> list[str]:
+    if level == 1:
+        return group_chat_ids
+    if level == 2:
+        return group_2_chat_ids
+    raise ValueError

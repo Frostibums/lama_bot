@@ -4,14 +4,11 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardBut
 def get_main_keyboard() -> ReplyKeyboardMarkup:
     kb = [
         [
-            KeyboardButton(text="нет я хочу к ламычу в привку"),
+            KeyboardButton(text="Варианты подписки"),
         ],
         [
-            KeyboardButton(text="инфа"),
+            KeyboardButton(text="Статус подписки"),
         ],
-        [
-            KeyboardButton(text="контакты"),
-        ]
     ]
 
     return ReplyKeyboardMarkup(
@@ -24,13 +21,10 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
 def get_subscribe_keyboard() -> ReplyKeyboardMarkup:
     kb = [
         [
-            KeyboardButton(text="я псих и хочу стать топ-криптаном"),
+            KeyboardButton(text="Выбрать вариант"),
         ],
         [
-            KeyboardButton(text="ламыч шо по подписке там"),
-        ],
-        [
-            KeyboardButton(text="меню"),
+            KeyboardButton(text="Статус подписки"),
         ],
     ]
 
@@ -44,7 +38,7 @@ def get_subscribe_keyboard() -> ReplyKeyboardMarkup:
 def get_subscribe_plans_keyboard(active_plans) -> InlineKeyboardMarkup:
     kb = [
         [
-            InlineKeyboardButton(text=f"{plan.subscription_time} дней за {plan.price}$", callback_data=f"subscription_{plan.id}"),
+            InlineKeyboardButton(text=f"{plan.text}", callback_data=f"subscription_{plan.id}"),
         ]
         for plan in active_plans
     ]

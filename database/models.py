@@ -20,6 +20,8 @@ class SubscriptionPlan(Base):
     id = Column(Integer, primary_key=True)
     subscription_time = Column(Integer, nullable=False)  # in days
     price = Column(Integer, nullable=False)  # in dollars/USDT
+    text = Column(String, nullable=True)
+    level = Column(Integer, nullable=True, default=1)
     is_active = Column(Boolean, unique=False, default=True)
 
 

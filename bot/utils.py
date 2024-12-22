@@ -8,10 +8,9 @@ from bot.config import PAYMENT_WALLET, SCANS_API_KEYS, notification_chat_id
 from database.services import get_transaction_hash, get_plan_price_by_id
 
 
-async def check_payment_valid(plan_id, chain, token, txn_hash) -> bool:
+async def check_payment_valid(plan_id, chain, token, txn_hash: str) -> bool:
     if not all([plan_id, chain, token, txn_hash]):
         return False
-
     if await get_transaction_hash(txn_hash):
         return False
 

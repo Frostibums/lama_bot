@@ -3,7 +3,7 @@ import datetime
 import logging
 from typing import cast
 
-from sqlalchemy import select, func, update, exists
+from sqlalchemy import select, func, update, exists, or_
 
 from bot.config import group_chat_ids, group_2_chat_ids
 from database.db import async_session
@@ -164,9 +164,10 @@ async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1)
         select(User)
         .join(Subscription, User.telegram_id == Subscription.owner_telegram_id)
         .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-        .where(SubscriptionPlan.level == level)
-        .where(Subscription.end_time <= exp_date)
-        )
+        .where(or_(SubscriptionPlan.level == level, SubscriptionPlan.level == None))
+        .having(func.max(Subscription.end_time) <= exp_date)
+        .group_by(User.telegram_id)
+    )
 
     if level == 1:
         query = query.where(

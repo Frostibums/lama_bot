@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import logging
 
 from aiogram.enums import ChatMemberStatus
 from aiogram.exceptions import TelegramBadRequest
@@ -7,9 +8,12 @@ from aiogram.exceptions import TelegramBadRequest
 from bot.texts import TextService
 from bot.utils import send_notification
 from celery_beat import celery_app
-from database.services import get_tg_ids_to_notify_by_exp_date, get_users_to_kick_by_exp_date
+from database.services import get_tg_ids_to_notify_by_exp_date, get_users_to_kick_by_exp_date, get_downgraded_users
 from bot.bot_tg import tg_bot
 from bot.config import group_chat_ids, group_2_chat_ids
+
+
+logger = logging.getLogger('kick_notify')
 
 
 async def kick_user_from_group(chat_id, user_tg_id: int) -> bool:
@@ -63,11 +67,13 @@ async def async_notify_about_subscription_expiration():
 async def async_kick_users_with_exp_sub():
     delta_days = 3
     kick_day = datetime.date.today() - datetime.timedelta(days=delta_days)
-    kicking_lvl1 = await get_users_to_kick_by_exp_date(kick_day, level=1)
-    kicking_lvl2 = await get_users_to_kick_by_exp_date(kick_day, level=2)
+
+    kicking_lvl1 = list(await get_users_to_kick_by_exp_date(kick_day, level=1))  # кикаем из первой группы (кончилась первая и нет второй)
+    kicking_both = list(await get_users_to_kick_by_exp_date(kick_day, level=2))  # кикаем из обеих групп (кончилась вторая и нет первой)
+    downgrade = list(await get_downgraded_users(kick_day))  # кикаем только со второй группы (кончилась вторая, есть первая)
 
     kicked = []
-    for u in kicking_lvl1:
+    for u in kicking_lvl1 + kicking_both:
         for chat_id in group_chat_ids:
             try:
                 if await kick_user_from_group(chat_id, u.telegram_id):
@@ -75,14 +81,16 @@ async def async_kick_users_with_exp_sub():
                 await asyncio.sleep(1)
             except Exception as e:
                 continue
+
     if kicked:
+        logger.info(f'кикнул {kicked}')
         await send_notification(
             tg_bot,
-            'Из 1 lvl кикнуты:\n' + '\n'.join([f'{u.telegram_username} ({u.telegram_id})' for u in kicked]),
+            'Из групп 1 lvl кикнуты:\n' + '\n'.join([f'{u.telegram_username} ({u.telegram_id})' for u in kicked]),
         )
 
     kicked = []
-    for u in kicking_lvl2:
+    for u in downgrade + kicking_both:
         for chat_id in group_2_chat_ids:
             try:
                 if await kick_user_from_group(chat_id, u.telegram_id):
@@ -91,9 +99,10 @@ async def async_kick_users_with_exp_sub():
             except Exception as e:
                 continue
     if kicked:
+        logger.info(f'кикнул {kicked}')
         await send_notification(
             tg_bot,
-            'Из 2 lvl кикнуты:\n' + '\n'.join([f'{u.telegram_username} ({u.telegram_id})' for u in kicked]),
+            'Из групп 2 lvl кикнуты:\n' + '\n'.join([f'{u.telegram_username} ({u.telegram_id})' for u in kicked]),
         )
 
     return True

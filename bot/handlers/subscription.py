@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from aiogram import Router, F
 from aiogram.exceptions import TelegramBadRequest
@@ -19,6 +20,7 @@ from database.services import (get_user_subscription_exp_date,
 subscription_router = Router()
 section = 'subscription'
 
+logger = logging.getLogger('Subscriptios')
 
 @subscription_router.message(F.text.lower() == "статус подписки")
 async def check_subscription_status(message: Message) -> None:
@@ -105,6 +107,7 @@ async def process_hash(message: Message, state: FSMContext) -> None:
                 transaction_hash=txn_hash,
                 subscription_plan_id=plan_id
             )
+            logger.info(f'{tg_user.username} ({tg_user.id}): {txn_hash} ({chain}) {plan_id=}')
 
             await message.answer(text=msg_text, reply_markup=get_main_keyboard())
             await send_notification(
@@ -113,10 +116,11 @@ async def process_hash(message: Message, state: FSMContext) -> None:
                 f' {subscription_plan.text} за {subscription_plan.price}$:\n `{txn_hash}` ({chain})'
             )
 
-        except TelegramBadRequest:
+        except TelegramBadRequest as e:
             await message.answer(text=TextService.get_text(section, 'telegram_error'),
                                  reply_markup=get_main_keyboard())
             await state.update_data(plan_id=None, chain=None, txn_hash=None)
+            logger.error(str(e))
 
     else:
         await message.answer(text=TextService.get_text(section, 'bad_hash'),

@@ -1,8 +1,9 @@
+import asyncio
 import datetime
 import logging
 from typing import cast
 
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, exists
 
 from bot.config import group_chat_ids, group_2_chat_ids
 from database.db import async_session
@@ -165,8 +166,47 @@ async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1)
         .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
         .where(SubscriptionPlan.level == level)
         .where(Subscription.end_time <= exp_date)
-    )
+        )
 
+    if level == 1:
+        query = query.where(
+            ~exists(
+                select(Subscription.owner_telegram_id)
+                .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+                .where(SubscriptionPlan.level == 2)
+                .where(Subscription.end_time > exp_date)
+            )
+        )
+    if level == 2:
+        query = query.where(
+            ~exists(
+                select(Subscription.owner_telegram_id)
+                .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+                .where(SubscriptionPlan.level == 1)
+                .where(Subscription.end_time > exp_date)
+            )
+        )
+
+    async with async_session() as session:
+        return await session.scalars(query)
+
+
+async def get_downgraded_users(exp_date: datetime.date) -> list[User]:
+    query = (
+        select(User)
+        .join(Subscription, User.telegram_id == Subscription.owner_telegram_id)
+        .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+        .where(SubscriptionPlan.level == 2)
+        .where(Subscription.end_time <= exp_date)
+        .where(
+            exists(
+                select(Subscription.owner_telegram_id)
+                .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
+                .where(SubscriptionPlan.level == 1)
+                .where(Subscription.end_time > exp_date)
+            )
+        )
+    )
     async with async_session() as session:
         return await session.scalars(query)
 
@@ -211,5 +251,5 @@ async def get_plan_chats_by_lvl(level: int) -> list[str]:
     if level == 1:
         return group_chat_ids
     if level == 2:
-        return group_2_chat_ids
+        return group_chat_ids + group_2_chat_ids
     raise ValueError

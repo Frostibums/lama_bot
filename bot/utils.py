@@ -59,7 +59,6 @@ async def send_notification(bot, msg: str):
         await bot.send_message(
             notification_chat_id,
             msg,
-            parse_mode='Markdown',
         )
     except Exception as e:
         logging.error(e)

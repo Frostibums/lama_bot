@@ -158,6 +158,15 @@ async def get_tg_ids_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1
                   if await get_user_subscription_exp_date(tg_id[0], level) <= exp_date]
         return tg_ids or []
 
+def testt():
+    date = datetime.date.fromisoformat('2025-01-31')
+    r1 = asyncio.run(get_users_to_kick_by_exp_date(date, 1))
+    r2 = asyncio.run(get_users_to_kick_by_exp_date(date, 2))
+    r3 = asyncio.run(get_downgraded_users(date))
+    print([r.telegram_username for r in r1])
+    print([r.telegram_username for r in r2])
+    print([r.telegram_username for r in r3])
+
 
 async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[User]:
     query = (
@@ -170,8 +179,7 @@ async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1)
     )
 
     if level == 1:
-        query = query.where(
-            ~exists(
+        query = query.where(~Subscription.owner_telegram_id.in_(
                 select(Subscription.owner_telegram_id)
                 .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
                 .where(SubscriptionPlan.level == 2)
@@ -179,8 +187,7 @@ async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1)
             )
         )
     if level == 2:
-        query = query.where(
-            ~exists(
+        query = query.where(~Subscription.owner_telegram_id.in_(
                 select(Subscription.owner_telegram_id)
                 .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
                 .where(SubscriptionPlan.level == 1)
@@ -198,15 +205,15 @@ async def get_downgraded_users(exp_date: datetime.date) -> list[User]:
         .join(Subscription, User.telegram_id == Subscription.owner_telegram_id)
         .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
         .where(SubscriptionPlan.level == 2)
-        .where(Subscription.end_time <= exp_date)
-        .where(
-            exists(
+        .having(func.max(Subscription.end_time) <= exp_date)
+        .where(Subscription.owner_telegram_id.in_(
                 select(Subscription.owner_telegram_id)
                 .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
                 .where(SubscriptionPlan.level == 1)
                 .where(Subscription.end_time > exp_date)
             )
         )
+        .group_by(User.telegram_id)
     )
     async with async_session() as session:
         return await session.scalars(query)

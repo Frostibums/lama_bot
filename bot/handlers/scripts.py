@@ -4,7 +4,7 @@ import os
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 
-from bot.config import DOWNLOADS_DIR
+from bot.config import DOWNLOADS_DIR, admins
 from bot.keyboards import get_files_keyboard, get_main_keyboard
 from database.services import has_scripts_sub
 
@@ -17,10 +17,10 @@ logger = logging.getLogger('Scripts')
 @scripts_router.message(F.text.lower() == "скрипты")
 async def send_files_keyboard(message: Message):
     """Отправляет клавиатуру с файлами из папки downloads."""
-    if not await has_scripts_sub(message.from_user.id):
+    if message.from_user.id not in admins and not await has_scripts_sub(message.from_user.id):
         await message.answer(
             "Для доступа к скриптам необходимо купить подписку второго уровня",
-            reply_markup= await get_main_keyboard(),
+            reply_markup=await get_main_keyboard(),
         )
         logger.info(
             f'{message.from_user.username} ({message.from_user.id}) пытался получить доступ к скриптам без подписки'
@@ -34,10 +34,10 @@ async def send_files_keyboard(message: Message):
 @scripts_router.callback_query(F.data.startswith("file_"))
 async def send_file(callback: CallbackQuery):
     """Обрабатывает нажатие на кнопку файла и отправляет файл пользователю."""
-    if not await has_scripts_sub(callback.from_user.id):
+    if callback.message.from_user.id not in admins and not await has_scripts_sub(callback.message.from_user.id):
         await callback.message.answer(
             "Для доступа к скриптам необходимо купить подписку второго уровня",
-            reply_markup= await get_main_keyboard(),
+            reply_markup=await get_main_keyboard(),
         )
         logger.info(
             f'{callback.message.from_user.username} ({callback.message.from_user.id}) '

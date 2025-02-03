@@ -145,6 +145,10 @@ async def give_subscription(message: Message):
     scripts_allowance = True if scripts.strip().lower() == 'да' else False
     if await give_sub(tg_id, tg_username, end_date, scripts_allowance):
         await message.reply(f'Выдал доступ {tg_username} до {end_date}')
+        logger.info(
+            f'{message.from_user.username} ({message.from_user.id}) выдал подписку '
+            f'{tg_username} ({tg_id}) до {end_date}, со скриптами: {scripts_allowance}'
+        )
         return True
     await message.reply('Что-то пошло не так')
 

@@ -42,3 +42,12 @@ class Subscription(Base):
     txn_hash_id = Column(Integer, ForeignKey('txn_hashes.id'), nullable=True)
     start_time = Column(DATE, default=datetime.date.today())
     end_time = Column(DATE, nullable=True)
+
+
+class ScriptsSubscription(Base):
+    __tablename__ = 'scripts_subscriptions'
+
+    id = Column(Integer, primary_key=True)
+    owner_telegram_id = Column(BigInteger, ForeignKey('users.telegram_id'))
+    start_time = Column(DATE, default=datetime.date.today())
+    end_time = Column(DATE, nullable=True)

@@ -1,7 +1,12 @@
+import os
+
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 
+from bot.config import DOWNLOADS_DIR, admins
+from database.services import has_scripts_sub
 
-def get_main_keyboard() -> ReplyKeyboardMarkup:
+
+async def get_main_keyboard(telegram_id: int | None = None) -> ReplyKeyboardMarkup:
     kb = [
         [
             KeyboardButton(text="Варианты подписки"),
@@ -10,6 +15,8 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="Статус подписки"),
         ],
     ]
+    if telegram_id and (telegram_id in admins or await has_scripts_sub(telegram_id)):
+        kb.append([KeyboardButton(text="Скрипты")])
 
     return ReplyKeyboardMarkup(
         keyboard=kb,
@@ -73,3 +80,32 @@ def get_subscribe_chain_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
+def get_files_keyboard(directory: str = DOWNLOADS_DIR) -> InlineKeyboardMarkup:
+    """Создает инлайн-клавиатуру с кнопками для всех файлов в указанной папке."""
+    if not os.path.exists(directory):  # Проверяем, существует ли папка
+        return InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Пока тут пусто", callback_data="empty")]])
+
+    files = os.listdir(directory)  # Получаем список файлов
+    buttons = [
+        [InlineKeyboardButton(text=file, callback_data=f"file_{file}")]
+        for file in files if os.path.isfile(os.path.join(directory, file))
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def delete_files_keyboard(directory: str = DOWNLOADS_DIR) -> InlineKeyboardMarkup:
+    """Создает инлайн-клавиатуру с кнопками для всех файлов в указанной папке."""
+    if not os.path.exists(directory):
+        return InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Пока тут пусто", callback_data="empty")]]
+        )
+
+    files = os.listdir(directory)
+    buttons = [
+        [InlineKeyboardButton(text=file, callback_data=f"del_file_{file}")]
+        for file in files if os.path.isfile(os.path.join(directory, file))
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

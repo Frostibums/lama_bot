@@ -1,13 +1,11 @@
-import asyncio
 import datetime
-import logging
 from typing import cast
 
-from sqlalchemy import select, func, update, exists, or_
+from sqlalchemy import select, func, update
 
-from bot.config import group_chat_ids, group_2_chat_ids
+from bot.config import group_chat_ids
 from database.db import async_session
-from database.models import User, SubscriptionPlan, TxnHash, Subscription
+from database.models import User, SubscriptionPlan, TxnHash, Subscription, ScriptsSubscription
 
 
 async def create_user(telegram_id, telegram_username):
@@ -39,20 +37,17 @@ async def get_plan_price_by_id(plan_id):
     return plan.price if plan else None
 
 
-async def get_user_subscription_exp_date(telegram_id, subscr_lvl: int = 1):
+async def get_user_subscription_exp_date(telegram_id: int) -> datetime.date:
+    query = (
+        select(func.max(Subscription.end_time))
+        .where(Subscription.owner_telegram_id == telegram_id)
+    )
     async with async_session() as session:
-        query = (
-            select(func.max(Subscription.end_time))
-            .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-            .where(Subscription.owner_telegram_id == telegram_id, SubscriptionPlan.level == subscr_lvl)
-        )
-        query_result = await session.execute(query)
-        exp_date = query_result.first()
-        return exp_date[0] if exp_date else None
+        return await session.scalar(query)
 
 
-async def has_active_subscription(telegram_id, subscr_lvl: int = 1):
-    exp_date = await get_user_subscription_exp_date(telegram_id, subscr_lvl)
+async def has_active_subscription(telegram_id: int) -> bool:
+    exp_date = await get_user_subscription_exp_date(telegram_id)
     if not exp_date:
         return False
     return exp_date >= datetime.date.today()
@@ -62,6 +57,7 @@ async def give_sub(
         telegram_id: int,
         telegram_username: str,
         end_date: datetime.date,
+        scripts_allowance: bool = False,
 ) -> bool:
     async with async_session() as session:
         user = await get_user_by_telegram_id(telegram_id)
@@ -73,6 +69,13 @@ async def give_sub(
             end_time=end_date,
         )
         session.add(subscription)
+
+        if scripts_allowance:
+            await create_scripts_subscription(
+                telegram_id=user.telegram_id,
+                end_time=end_date,
+            )
+
         await session.commit()
 
         return True
@@ -115,6 +118,12 @@ async def create_subscription(
         session.add(subscription)
         await session.commit()
 
+        if plan.level > 1:
+            await create_scripts_subscription(
+                telegram_id=user.telegram_id,
+                end_time=datetime.date.today() + delta,
+            )
+
         return True
 
 
@@ -126,6 +135,33 @@ async def get_transaction_hash(transaction_hash):
     return txn_hash[0] if txn_hash else None
 
 
+async def create_scripts_subscription(telegram_id: int, end_time: datetime.date) -> ScriptsSubscription:
+    new_scripts_sub = ScriptsSubscription(
+        owner_telegram_id=telegram_id,
+        end_time=end_time,
+    )
+    async with async_session() as session:
+        session.add(new_scripts_sub)
+        await session.commit()
+        return new_scripts_sub
+
+
+async def scripts_sub_end_date(telegram_id: int) -> datetime.date:
+    async with async_session() as session:
+        return await session.scalar(
+            select(func.max(ScriptsSubscription.end_time))
+            .where(ScriptsSubscription.owner_telegram_id == telegram_id)
+        )
+
+
+async def has_scripts_sub(telegram_id: int, by_date: datetime.date | None = None) -> bool:
+    end_date = await scripts_sub_end_date(telegram_id)
+    if not end_date:
+        return False
+    by_date = by_date or datetime.date.today()
+    return end_date >= by_date
+
+
 async def create_subscription_plan(subscription_time, price, level, text):
     async with async_session() as session:
         new_plan = SubscriptionPlan(subscription_time=subscription_time, price=price, level=level, text=text)
@@ -134,111 +170,49 @@ async def create_subscription_plan(subscription_time, price, level, text):
         return new_plan
 
 
-async def get_tg_ids_to_notify_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[int]:
+async def get_tg_ids_to_notify_by_exp_date(exp_date: datetime.date) -> list[int]:
+    query = (
+        select(Subscription.owner_telegram_id)
+        .group_by(Subscription.owner_telegram_id)
+        .having(func.max(Subscription.end_time) == exp_date)
+    )
     async with async_session() as session:
-        query = (
-            select(Subscription.owner_telegram_id)
-            .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-            .where(Subscription.end_time == exp_date, SubscriptionPlan.level == level)
-        )
-        query_result = await session.scalars(query)
-        tg_ids = []
-        for tg_id in query_result:
-            end_date = await get_user_subscription_exp_date(tg_id, level)
-            if end_date and end_date <= exp_date:
-                tg_ids.append(tg_id)
-        return tg_ids
+        return await session.scalars(query) or []
 
 
-async def get_tg_ids_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[int]:
-    async with async_session() as session:
-        query = select(Subscription.owner_telegram_id).where(Subscription.end_time <= exp_date).filter_by(level=level)
-        query_result = await session.execute(query)
-        tg_ids = [tg_id[0] for tg_id in query_result.all()
-                  if await get_user_subscription_exp_date(tg_id[0], level) <= exp_date]
-        return tg_ids or []
-
-def testt():
-    date = datetime.date.fromisoformat('2025-01-31')
-    r1 = asyncio.run(get_users_to_kick_by_exp_date(date, 1))
-    r2 = asyncio.run(get_users_to_kick_by_exp_date(date, 2))
-    r3 = asyncio.run(get_downgraded_users(date))
-    print([r.telegram_username for r in r1])
-    print([r.telegram_username for r in r2])
-    print([r.telegram_username for r in r3])
-
-
-async def get_users_to_kick_by_exp_date(exp_date: datetime.date, level: int = 1) -> list[User]:
+async def get_users_to_kick_by_exp_date(exp_date: datetime.date) -> list[User]:
     query = (
         select(User)
         .join(Subscription, User.telegram_id == Subscription.owner_telegram_id)
-        .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-        .where(or_(SubscriptionPlan.level == level, SubscriptionPlan.level == None))
+        .group_by(User)
         .having(func.max(Subscription.end_time) <= exp_date)
-        .group_by(User.telegram_id)
-    )
-
-    if level == 1:
-        query = query.where(~Subscription.owner_telegram_id.in_(
-                select(Subscription.owner_telegram_id)
-                .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-                .where(SubscriptionPlan.level == 2)
-                .where(Subscription.end_time > exp_date)
-            )
-        )
-    if level == 2:
-        query = query.where(~Subscription.owner_telegram_id.in_(
-                select(Subscription.owner_telegram_id)
-                .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-                .where(SubscriptionPlan.level == 1)
-                .where(Subscription.end_time > exp_date)
-            )
-        )
-
-    async with async_session() as session:
-        return await session.scalars(query)
-
-
-async def get_downgraded_users(exp_date: datetime.date) -> list[User]:
-    query = (
-        select(User)
-        .join(Subscription, User.telegram_id == Subscription.owner_telegram_id)
-        .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-        .where(SubscriptionPlan.level == 2)
-        .having(func.max(Subscription.end_time) <= exp_date)
-        .where(Subscription.owner_telegram_id.in_(
-                select(Subscription.owner_telegram_id)
-                .join(SubscriptionPlan, Subscription.subscription_plan_id == SubscriptionPlan.id)
-                .where(SubscriptionPlan.level == 1)
-                .where(Subscription.end_time > exp_date)
-            )
-        )
-        .group_by(User.telegram_id)
     )
     async with async_session() as session:
-        return await session.scalars(query)
+        return await session.scalars(query) or []
 
 
 async def get_sub_users_info():
-    async with async_session() as session:
-        query = select(
-            User.telegram_id,
-            User.telegram_username,
-            User.registered_at,
-            func.max(Subscription.end_time).label('end_time')
-        ).join(
-            Subscription, User.telegram_id == Subscription.owner_telegram_id
-        ).group_by(User.telegram_id, User.telegram_username, User.registered_at)
+    query = select(
+        User.telegram_id,
+        User.telegram_username,
+        User.registered_at,
+        func.max(Subscription.end_time).label('end_time'),
+        func.max(ScriptsSubscription.end_time).label('scripts_end_time'),
+    ).join(
+        Subscription, User.telegram_id == Subscription.owner_telegram_id
+    ).join(
+        ScriptsSubscription, User.telegram_id == ScriptsSubscription.owner_telegram_id, isouter=True
+    ).group_by(User.telegram_id).order_by(func.max(Subscription.end_time).desc())
 
+    async with async_session() as session:
         query_result = await session.execute(query)
         return query_result.fetchall()
 
 
 async def get_active_plans() -> list[SubscriptionPlan]:
+    query = select(SubscriptionPlan).filter_by(is_active=True)
     async with async_session() as session:
-        query = select(SubscriptionPlan).filter_by(is_active=True)
-        query_result = await session.execute(query)
-        return [plan[0] for plan in query_result.all()] if query_result else []
+        return await session.scalars(query)
 
 
 async def get_plans() -> list[SubscriptionPlan]:
@@ -247,17 +221,13 @@ async def get_plans() -> list[SubscriptionPlan]:
 
 
 async def update_plan_activity(plan_id: int, active: bool) -> None:
+    stmt = update(SubscriptionPlan).where(
+        cast('ColumnElement[bool]', SubscriptionPlan.id == plan_id)
+    ).values(is_active=active)
     async with async_session() as session:
-        stmt = update(SubscriptionPlan).where(
-            cast('ColumnElement[bool]', SubscriptionPlan.id == plan_id)
-        ).values(is_active=active)
         await session.execute(stmt)
         await session.commit()
 
 
-async def get_plan_chats_by_lvl(level: int) -> list[str]:
-    if level == 1:
-        return group_chat_ids
-    if level == 2:
-        return group_chat_ids + group_2_chat_ids
-    raise ValueError
+async def get_chat_ids() -> list[str]:
+    return group_chat_ids

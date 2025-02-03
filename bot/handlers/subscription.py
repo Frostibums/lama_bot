@@ -12,29 +12,38 @@ from bot.keyboards import get_main_keyboard, get_subscribe_plans_keyboard, get_s
 from bot.states import Subscription
 from bot.texts import TextService
 from bot.utils import check_payment_valid, send_notification
-from database.services import (get_user_subscription_exp_date,
-                               get_active_plans,
-                               has_active_subscription,
-                               create_subscription, get_plan_by_id, get_plan_chats_by_lvl)
+from database.services import (
+    get_user_subscription_exp_date,
+    get_active_plans,
+    has_active_subscription,
+    create_subscription,
+    get_plan_by_id,
+    get_chat_ids,
+    scripts_sub_end_date
+)
 
 subscription_router = Router()
 section = 'subscription'
 
 logger = logging.getLogger('Subscriptios')
 
+
 @subscription_router.message(F.text.lower() == "статус подписки")
 async def check_subscription_status(message: Message) -> None:
-    exp_date_1 = await get_user_subscription_exp_date(message.from_user.id, subscr_lvl=1)
-    exp_date_2 = await get_user_subscription_exp_date(message.from_user.id, subscr_lvl=2)
+    exp_date_chat = await get_user_subscription_exp_date(message.from_user.id)
+    exp_date_scripts = await scripts_sub_end_date(message.from_user.id)
     msg = ''
-    if exp_date_1 and exp_date_1 >= datetime.date.today():
-        msg += f'Подписка v1 заканчивается {exp_date_1}\n'
-    if exp_date_2 and exp_date_2 >= datetime.date.today():
-        msg += f'Подписка v2 заканчивается {exp_date_2}\n'
+    if exp_date_chat and exp_date_chat >= datetime.date.today():
+        msg += f'Подписка заканчивается {exp_date_chat}\n'
+    if exp_date_scripts and exp_date_scripts >= datetime.date.today():
+        msg += f'Подписка на скрипты заканчивается {exp_date_scripts}\n'
     if not msg:
-        await message.answer(TextService.get_text(section, 'has_no_sub'), reply_markup=get_main_keyboard())
+        await message.answer(
+            TextService.get_text(section, 'has_no_sub'),
+            reply_markup=await get_main_keyboard(telegram_id=message.from_user.id),
+        )
     else:
-        await message.answer(msg, reply_markup=get_main_keyboard())
+        await message.answer(msg, reply_markup=await get_main_keyboard(telegram_id=message.from_user.id))
 
 
 @subscription_router.message(F.text.lower() == "выбрать вариант")
@@ -88,15 +97,15 @@ async def process_hash(message: Message, state: FSMContext) -> None:
     txn_hash = data.get('txn_hash')
     tg_user = message.from_user
 
-    reply_msg = await message.reply(text=f'Проверяем...', reply_markup=get_main_keyboard())
+    reply_msg = await message.reply(text=f'Проверяем...', reply_markup=await get_main_keyboard())
     if await check_payment_valid(plan_id, chain, token, txn_hash):
         subscription_plan = await get_plan_by_id(plan_id)
         try:
             msg_text = TextService.get_text(section, 'thank_for_sub')
 
-            if not await has_active_subscription(tg_user.id, subscription_plan.level):
+            if not await has_active_subscription(tg_user.id):
                 invite_links = [await message.bot.create_chat_invite_link(chat_id=chat_id, member_limit=1)
-                                for chat_id in await get_plan_chats_by_lvl(subscription_plan.level)]
+                                for chat_id in await get_chat_ids()]
                 invite_links_to_show = '\n'.join([invite_link.invite_link for invite_link in invite_links])
                 msg_text += f'\n\n{invite_links_to_show}'
 
@@ -109,7 +118,7 @@ async def process_hash(message: Message, state: FSMContext) -> None:
             )
             logger.info(f'{tg_user.username} ({tg_user.id}): {txn_hash} ({chain}) {plan_id=}')
 
-            await message.answer(text=msg_text, reply_markup=get_main_keyboard())
+            await message.answer(text=msg_text, reply_markup=await get_main_keyboard(telegram_id=message.from_user.id))
             await send_notification(
                 message.bot,
                 f'{message.from_user.username} ({message.from_user.id}) купил подписку'
@@ -118,13 +127,14 @@ async def process_hash(message: Message, state: FSMContext) -> None:
 
         except TelegramBadRequest as e:
             await message.answer(text=TextService.get_text(section, 'telegram_error'),
-                                 reply_markup=get_main_keyboard())
+                                 reply_markup=await get_main_keyboard(telegram_id=message.from_user.id))
             await state.update_data(plan_id=None, chain=None, txn_hash=None)
             logger.error(str(e))
-
     else:
-        await message.answer(text=TextService.get_text(section, 'bad_hash'),
-                             reply_markup=get_main_keyboard())
+        await message.answer(
+            text=TextService.get_text(section, 'bad_hash'),
+            reply_markup=await get_main_keyboard(telegram_id=message.from_user.id),
+        )
 
     await reply_msg.delete()
-    await state.update_data(plan_id=None, chain=None, txn_hash=None)
+    await state.clear()

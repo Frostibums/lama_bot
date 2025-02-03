@@ -8,9 +8,9 @@ from aiogram.exceptions import TelegramBadRequest
 from bot.texts import TextService
 from bot.utils import send_notification
 from celery_beat import celery_app
-from database.services import get_tg_ids_to_notify_by_exp_date, get_users_to_kick_by_exp_date, get_downgraded_users
+from database.services import get_tg_ids_to_notify_by_exp_date, get_users_to_kick_by_exp_date
 from bot.bot_tg import tg_bot
-from bot.config import group_chat_ids, group_2_chat_ids
+from bot.config import group_chat_ids
 
 
 logger = logging.getLogger('kick_notify')
@@ -35,30 +35,23 @@ async def async_notify_about_subscription_expiration():
     delta_days = 3
     today = datetime.date.today()
 
-    telegram_ids_to_notify_1 = set(
-        await get_tg_ids_to_notify_by_exp_date(today + datetime.timedelta(days=delta_days), level=1)
-    )
-    telegram_ids_to_notify_2 = set(
-        await get_tg_ids_to_notify_by_exp_date(today + datetime.timedelta(days=delta_days), level=2)
-    )
-
-    for telegram_id in telegram_ids_to_notify_1.union(telegram_ids_to_notify_2):
+    telegram_ids_to_notify = await get_tg_ids_to_notify_by_exp_date(today + datetime.timedelta(days=delta_days))
+    for telegram_id in set(telegram_ids_to_notify):
         try:
             await tg_bot.send_message(telegram_id, TextService.get_text('subscription', 'expiration'))
         except Exception as e:
+            logger.error(f'Не удалось отправить уведомление об окончании подписки {telegram_id}: {str(e)}')
             continue
 
     telegram_ids_expired = set()
-    for i in range(0, delta_days + 1):
-        for level in (1, 2):
-            telegram_ids_expired = telegram_ids_expired.union(await get_tg_ids_to_notify_by_exp_date(
-                today - datetime.timedelta(days=i),
-                level,
-            ))
+    for i in range(1, delta_days + 1):
+        telegram_ids_expired.union(await get_tg_ids_to_notify_by_exp_date(today - datetime.timedelta(days=i)))
+
     for telegram_id in telegram_ids_expired:
         try:
             await tg_bot.send_message(telegram_id, TextService.get_text('subscription', 'expired'))
         except Exception as e:
+            logger.error(f'Не удалось отправить уведомление об окончании подписки {telegram_id}: {str(e)}')
             continue
 
     return True
@@ -68,44 +61,26 @@ async def async_kick_users_with_exp_sub():
     delta_days = 3
     kick_day = datetime.date.today() - datetime.timedelta(days=delta_days)
 
-    kicking_lvl1 = list(await get_users_to_kick_by_exp_date(kick_day, level=1))  # кикаем из первой группы (кончилась первая и нет второй)
-    kicking_both = list(await get_users_to_kick_by_exp_date(kick_day, level=2))  # кикаем из обеих групп (кончилась вторая и нет первой)
-    downgrade = list(await get_downgraded_users(kick_day))  # кикаем только со второй группы (кончилась вторая, есть первая)
-
+    users_to_kick = await get_users_to_kick_by_exp_date(kick_day)
     kicked = []
-    for u in kicking_lvl1 + kicking_both:
+    for user in users_to_kick:
         for chat_id in group_chat_ids:
             try:
-                if await kick_user_from_group(chat_id, u.telegram_id):
-                    kicked.append(u)
-                await asyncio.sleep(1)
+                if await kick_user_from_group(chat_id, user.telegram_id):
+                    kicked.append(user)
+                await asyncio.sleep(0.5)
             except Exception as e:
+                logger.error(f'Ошибка при кике {user.telegram_id}: {str(e)}')
                 continue
 
+    notify_msg = 'Кикнуты:\n' + '\n'.join([f'{str(u.telegram_username)} ({u.telegram_id})' for u in kicked])
+    logger.info(notify_msg)
     if kicked:
-        logger.info(f'кикнул {kicked}')
         await send_notification(
             tg_bot,
-            'Из групп 1 lvl кикнуты:\n' + '\n'.join([f'{u.telegram_username} ({u.telegram_id})' for u in kicked]),
+            notify_msg,
         )
-
-    kicked = []
-    for u in downgrade + kicking_both:
-        for chat_id in group_2_chat_ids:
-            try:
-                if await kick_user_from_group(chat_id, u.telegram_id):
-                    kicked.append(u)
-                await asyncio.sleep(1)
-            except Exception as e:
-                continue
-    if kicked:
-        logger.info(f'кикнул {kicked}')
-        await send_notification(
-            tg_bot,
-            'Из групп 2 lvl кикнуты:\n' + '\n'.join([f'{u.telegram_username} ({u.telegram_id})' for u in kicked]),
-        )
-
-    return True
+    return notify_msg
 
 
 @celery_app.task(autostart=False)

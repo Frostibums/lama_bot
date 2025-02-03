@@ -19,3 +19,5 @@ SCANS_API_KEYS = {
     'arbitrum': os.getenv('ARBISCAN_API_KEY'),
     'base': os.getenv('BASE_API_KEY'),
 }
+
+DOWNLOADS_DIR = os.getenv('DOWNLOADS_DIR')

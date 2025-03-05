@@ -191,7 +191,7 @@ async def get_users_to_kick_by_exp_date(exp_date: datetime.date) -> list[User]:
         return await session.scalars(query) or []
 
 
-async def get_sub_users_info():
+async def get_sub_users_info(is_full: bool = False):
     query = select(
         User.telegram_id,
         User.telegram_username,
@@ -202,11 +202,49 @@ async def get_sub_users_info():
         Subscription, User.telegram_id == Subscription.owner_telegram_id
     ).join(
         ScriptsSubscription, User.telegram_id == ScriptsSubscription.owner_telegram_id, isouter=True
-    ).group_by(User.telegram_id).order_by(func.max(Subscription.end_time).desc())
-
+    ).group_by(
+        User.telegram_id
+    ).order_by(
+        func.max(Subscription.end_time).desc()
+    )
+    if not is_full:
+        query = query.having(
+            func.max(Subscription.end_time) >= datetime.date.today() - datetime.timedelta(days=5)
+        )
     async with async_session() as session:
         query_result = await session.execute(query)
         return query_result.fetchall()
+
+
+async def edit_user_sub_end_time(user_id: int, new_end_time: datetime.date) -> User | None:
+    query = update(
+        Subscription
+    ).where(
+        Subscription.owner_telegram_id == user_id,
+        Subscription.end_time >= datetime.date.today() - datetime.timedelta(days=5),
+    ).values(
+        end_time=new_end_time
+    )
+    async with async_session() as session:
+        await session.execute(query)
+        await session.commit()
+        return await session.scalar(select(User).where(User.telegram_id == user_id))
+
+
+async def edit_user_scripts_sub_end_time(user_id: int, new_end_time: datetime.date) -> User | None:
+    query = update(
+        ScriptsSubscription
+    ).where(
+        ScriptsSubscription.owner_telegram_id == user_id,
+        ScriptsSubscription.end_time >= datetime.date.today() - datetime.timedelta(days=5),
+    ).values(
+        end_time=new_end_time
+    )
+
+    async with async_session() as session:
+        await session.execute(query)
+        await session.commit()
+        return await session.scalar(select(User).where(User.telegram_id == user_id))
 
 
 async def get_active_plans() -> list[SubscriptionPlan]:

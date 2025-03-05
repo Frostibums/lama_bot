@@ -8,9 +8,17 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from tabulate import tabulate
 
-from bot.config import admins, TOKEN, DOWNLOADS_DIR
+from bot.config import admins, DOWNLOADS_DIR
 from bot.keyboards import get_main_keyboard, delete_files_keyboard
-from database.services import create_subscription_plan, get_plans, update_plan_activity, give_sub, get_sub_users_info
+from database.services import (
+    create_subscription_plan,
+    get_plans,
+    update_plan_activity,
+    give_sub,
+    get_sub_users_info,
+    edit_user_sub_end_time,
+    edit_user_scripts_sub_end_time,
+)
 
 admin_router = Router()
 
@@ -26,7 +34,10 @@ async def get_help(message: Message):
 
     admin_commands = {
         '/help': 'Показать список доступных команд',
-        '/info': 'Показать информацию о пользователях',
+        '/info': 'Показать информацию о пользователях, у которых подписка активна '
+                 'или кончилась в течении 5 прошедших дней.\n'
+                 'Если после /info указать "Да", выведет список всех пользователей в БД.\n'
+                 'Пример:\n`/info Да`',
         '/add_plan': 'Добавить план.\n'
                      'Вводимые параметры: Количество дней, Цена в $, Уровень (1 / 2), Текст для кнопки.\n'
                      'Пример:\n`/add_plan 30 90 1 Подписка 1 уровня на 30 дней за 90$`',
@@ -37,6 +48,13 @@ async def get_help(message: Message):
                      'Вводимые параметры: Телеграм ID, Телеграм юзернейм, '
                      'Дата окончания подписки (в формате ISO), Доступ к скриптам (да/нет)\n'
                      'Пример:\n`/give_sub 310832640 MrOatmeal 2025-10-05 Да`',
+        '/edit_sub': 'Изменить подписку пользователю.\n'
+                     'Возможно изменить только подписки, дата которых больше, чем текущая минус 5 дней '
+                     '(т.е 2025-10-10 возможно изменить только подписки, заканчивающиеся 2025-10-05 или позднее).\n'
+                     'Вводимые параметры: Телеграм ID, Телеграм юзернейм, '
+                     'Дата окончания подписки (в формате ISO), Скриптовая подписка (да/нет)\n'
+                     'Если выбрана "Скриптовая подписка", изменится ТОЛЬКО дата подписки на скрипты.\n'
+                     'Пример:\n`/edit_sub 310832640 MrOatmeal 2025-10-05 Да`',
         '/delete': 'Удалить скрипт(ы).\n',
     }
 
@@ -153,13 +171,47 @@ async def give_subscription(message: Message):
     await message.reply('Что-то пошло не так')
 
 
+@admin_router.message(Command('edit_sub'))
+async def edit_subscription(message: Message):
+    logger.info(f'{message.from_user.username} ({message.from_user.id}) воспользовался командой `/edit_sub`')
+    if message.from_user.id not in admins:
+        return False
+    data = message.text.split()
+    try:
+        tg_id, tg_username, new_date, scripts = int(data[1]), str(data[2]).strip('@'), str(data[3]), str(data[4])
+        new_date = datetime.date.fromisoformat(new_date)
+        scripts = True if scripts.strip().lower() == 'да' else False
+    except Exception as e:
+        logger.error(f'Ошибка формата вводимых данных: {e}')
+        await message.reply(f'Ошибка формата вводимых данных')
+        return False
+
+    coro = edit_user_scripts_sub_end_time if scripts else edit_user_sub_end_time
+    user = await coro(tg_id, new_date)
+    if not user:
+        logger.info(f'{tg_username} ({tg_id}) не найден в бд')
+        await message.reply(f'{tg_username} ({tg_id}) не найден в бд')
+        return False
+
+    logger.info(
+        f'{message.from_user.username} ({message.from_user.id}) изменил '
+        f'{user.telegram_username} ({user.telegram_id}) дату окончания подписки {"на скрипты" if scripts else ""}'
+        f'на {new_date}'
+    )
+    await message.reply(
+        f'Изменил дату окончания подписки {"на скрипты" if scripts else ""} '
+        f'для {user.telegram_username} ({user.telegram_id}): {new_date}'
+    )
+
+
 @admin_router.message(Command('info'))
 async def users_info(message: Message):
     logger.info(f'{message.from_user.username} ({message.from_user.id}) воспользовался командой `/info`')
 
     if message.from_user.id not in admins:
         return False
-    infos = await get_sub_users_info()
+    full = len(message.text.split()) > 1
+    infos = await get_sub_users_info(is_full=full)
 
     table_data = [
         [

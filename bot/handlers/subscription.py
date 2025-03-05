@@ -94,7 +94,10 @@ async def process_hash(message: Message, state: FSMContext) -> None:
         return
     chain = data.get('chain')
     token = data.get('token')
-    txn_hash = data.get('txn_hash')
+    txn_hash: str = data.get('txn_hash')
+    if txn_hash.startswith('https'):
+        txn_hash = txn_hash.split('/')[-1]
+    logger.info(txn_hash)
     tg_user = message.from_user
 
     reply_msg = await message.reply(text=f'Проверяем...', reply_markup=await get_main_keyboard())

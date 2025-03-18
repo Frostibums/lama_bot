@@ -180,6 +180,16 @@ async def get_tg_ids_to_notify_by_exp_date(exp_date: datetime.date) -> list[int]
         return await session.scalars(query) or []
 
 
+async def get_tg_ids_to_notify_by_sub_exp_date(exp_date: datetime.date) -> list[int]:
+    query = (
+        select(ScriptsSubscription.owner_telegram_id)
+        .group_by(ScriptsSubscription.owner_telegram_id)
+        .having(func.max(ScriptsSubscription.end_time) == exp_date)
+    )
+    async with async_session() as session:
+        return await session.scalars(query) or []
+
+
 async def get_users_to_kick_by_exp_date(exp_date: datetime.date) -> list[User]:
     query = (
         select(User)

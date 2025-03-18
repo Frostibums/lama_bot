@@ -107,8 +107,14 @@ async def process_hash(message: Message, state: FSMContext) -> None:
             msg_text = TextService.get_text(section, 'thank_for_sub')
 
             if not await has_active_subscription(tg_user.id):
-                invite_links = [await message.bot.create_chat_invite_link(chat_id=chat_id, member_limit=1)
-                                for chat_id in await get_chat_ids()]
+                invite_links = [
+                    await message.bot.create_chat_invite_link(
+                        chat_id=chat_id,
+                        member_limit=1,
+                        expire_date=datetime.timedelta(days=3),
+                    )
+                    for chat_id in await get_chat_ids()
+                ]
                 invite_links_to_show = '\n'.join([invite_link.invite_link for invite_link in invite_links])
                 msg_text += f'\n\n{invite_links_to_show}'
 

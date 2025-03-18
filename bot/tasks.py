@@ -8,7 +8,11 @@ from aiogram.exceptions import TelegramBadRequest
 from bot.texts import TextService
 from bot.utils import send_notification
 from celery_beat import celery_app
-from database.services import get_tg_ids_to_notify_by_exp_date, get_users_to_kick_by_exp_date
+from database.services import (
+    get_tg_ids_to_notify_by_exp_date,
+    get_users_to_kick_by_exp_date,
+    get_tg_ids_to_notify_by_sub_exp_date,
+)
 from bot.bot_tg import tg_bot
 from bot.config import group_chat_ids
 
@@ -35,8 +39,10 @@ async def async_notify_about_subscription_expiration():
     delta_days = 3
     today = datetime.date.today()
 
+    tg_ids_scripts_ending = await get_tg_ids_to_notify_by_sub_exp_date(today + datetime.timedelta(days=delta_days))
     telegram_ids_to_notify = await get_tg_ids_to_notify_by_exp_date(today + datetime.timedelta(days=delta_days))
-    for telegram_id in set(telegram_ids_to_notify):
+
+    for telegram_id in set(tg_ids_scripts_ending + telegram_ids_to_notify):
         try:
             await tg_bot.send_message(telegram_id, TextService.get_text('subscription', 'expiration'))
         except Exception as e:
